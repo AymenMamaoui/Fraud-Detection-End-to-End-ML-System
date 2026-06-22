@@ -1,0 +1,9 @@
+data/
+models/
+*.csv
+*.pkl
+__pycache__/
+.ipynb_checkpoints/
+.env
+venv/
+.DS_Store
