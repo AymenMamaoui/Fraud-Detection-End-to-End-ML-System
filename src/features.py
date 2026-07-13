@@ -5,7 +5,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-
+from sklearn.impute import SimpleImputer
 
 
 
@@ -40,7 +40,8 @@ class TimeFeatures(BaseEstimator, TransformerMixin):
 
         return X
 
-
+    def get_feature_names_out(self, input_features=None):
+        return np.array(self.feature_names_out_)
 
 class FeatureSelector(BaseEstimator, TransformerMixin):
     """
@@ -79,6 +80,8 @@ class FeatureSelector(BaseEstimator, TransformerMixin):
         X = X.copy()
         return X[self.columns_to_keep_]
 
+    def get_feature_names_out(self, input_features=None):
+        return np.array(self.columns_to_keep_)
 
 
 class LogTransform(BaseEstimator, TransformerMixin):
@@ -92,7 +95,8 @@ class LogTransform(BaseEstimator, TransformerMixin):
     def transform(self, X):
         return np.log1p(X)
 
-
+    def get_feature_names_out(self, input_features=None):
+        return np.asarray(input_features)
 
 def build_preprocessor():
     """
@@ -112,14 +116,16 @@ def build_preprocessor():
     categorical = config.CATEGORICAL_FEATURES
     passthrough_numeric = ["hour", "day", "is_high_risk_hour"] + config.C_FEATURES
 
-    # Transformer for the transaction amount: log then scale
+    # Transformer for the transaction amount: impute, log, then scale
     amount_pipeline = Pipeline(steps=[
+        ("impute", SimpleImputer(strategy="median")),
         ("log", LogTransform()),
         ("scale", StandardScaler()),
     ])
 
-    # Transformer for categoricals: one-hot, robust to unseen values
+    # Transformer for categoricals: fill missing values, then one-hot encode
     categorical_pipeline = Pipeline(steps=[
+        ("impute", SimpleImputer(strategy="constant", fill_value="missing")),
         ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
     ])
 
