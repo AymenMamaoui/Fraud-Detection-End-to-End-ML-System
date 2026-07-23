@@ -51,15 +51,11 @@ def health_check():
 
 
 @app.post("/predict")
-def predict_transaction(transaction: Transaction):
+def predict_transaction(transaction: Transaction, top_n: int = 5):
     """
     Score a transaction for fraud risk.
-    Returns the fraud probability and the top contributing factors.
+    top_n controls how many contributing factors are returned.
     """
-    # Convert the validated Pydantic object into a plain dict
     tx_dict = transaction.model_dump()
-
-    # Delegate all the logic to predict() — api.py stays thin
-    result = predict(tx_dict)
-
+    result = predict(tx_dict, top_n=top_n)
     return result
