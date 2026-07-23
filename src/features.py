@@ -8,6 +8,40 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.impute import SimpleImputer
 
 
+def build_behavioral_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+        Create interpretable, business-level features from transaction history.
+
+        All statistics are computed causally: for each transaction, only
+        *earlier* transactions from the same card are used.
+    """
+    df = df.copy()
+    df = df.sort_values("TransactionDT").reset_index(drop=True)
+
+    # Historical mean per card, excluding the current transaction.
+    # shift(1) must happen INSIDE each group, hence the lambda.
+    df["card_mean_amount"] = df.groupby("card1")["TransactionAmt"].transform(
+        lambda s: s.expanding().mean().shift(1)
+    )
+
+    # Number of prior transactions for this card (0 for the first one)
+    df["card_txn_count"] = df.groupby("card1").cumcount()
+
+    # Ratio of current amount to the card's usual spend
+    df["amount_vs_card_mean"] = df["TransactionAmt"] / df["card_mean_amount"]
+
+    # Time elapsed since this card's previous transaction
+    df["time_since_last_txn"] = df.groupby("card1")["TransactionDT"].diff()
+
+    # Flag transactions with no prior history
+    df["is_first_transaction"] = df["card_mean_amount"].isna().astype(int)
+
+    # Neutral values where no history exists
+    df["amount_vs_card_mean"] = df["amount_vs_card_mean"].fillna(1.0)
+    df["time_since_last_txn"] = df["time_since_last_txn"].fillna(-1)
+
+    df = df.drop(columns=["card_mean_amount"])
+    return df
 
 class TimeFeatures(BaseEstimator, TransformerMixin):
     """
@@ -64,9 +98,8 @@ class FeatureSelector(BaseEstimator, TransformerMixin):
         self.categorical_features = config.CATEGORICAL_FEATURES
         self.c_features = config.C_FEATURES
 
+
     def fit(self, X, y=None):
-        # Build the final list of columns to keep, keeping only
-        # those actually present in the incoming data (safety check)
         wanted = (
             self.time_features
             + self.numeric_features

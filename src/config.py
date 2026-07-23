@@ -24,3 +24,14 @@ C_FEATURES = ["C1", "C3", "C5"]
 # PARAMETERS
 RANDOM_STATE = 42
 MISSING_THRESHOLD = 0.9   # drop columns emptier than this ratio
+
+# Behavioral features engineered from transaction history.
+# NOT used in the current model: they showed no performance gain and require
+# card-level history unavailable at inference time (would need a feature store).
+# Kept documented for reference — see README.
+BEHAVIORAL_FEATURES_EXPERIMENTAL = [
+    "amount_vs_card_mean",
+    "time_since_last_txn",
+    "card_txn_count",
+    "is_first_transaction",
+]
