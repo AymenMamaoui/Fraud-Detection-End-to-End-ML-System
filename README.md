@@ -17,18 +17,29 @@ IEEE-CIS Fraud Detection (Kaggle) — ~590,000 transactions, target `isFraud`.
 1. **Model** — Gradient boosting (XGBoost) on tabular data
 2. **Explainability** — SHAP (per-feature contributions)
 3. **Deployment** — FastAPI + Docker on AWS
-4. **Interface** — Streamlit dashboard (testing + monitoring)
+4. **Interface** — Streamlit dashboard for analyst-facing risk assessment
 5. **Monitoring** — Data drift detection
 
-## Architecture
-(TODO: add architecture diagram)
+## Model selection
+
+Three model families were compared on the same preprocessing pipeline and the
+same chronological split:
+
+| Model | ROC-AUC | PR-AUC | Train time (s) |
+|---|---|---|---|
+| **XGBoost** | **0.816** | **0.313** | **7.6** |
+| Random Forest | 0.773 | 0.139 | 11.4 |
+| Logistic Regression | 0.753 | 0.145 | 51.6 |
+
+XGBoost more than doubles the PR-AUC of both alternatives while also being the
+fastest to train — the choice is justified on both performance and cost.
 
 ## Results
 
 | Metric | Value |
 |---|---|
-| ROC-AUC | 0.8230 |
-| PR-AUC | 0.3068 |
+| ROC-AUC | 0.816 |
+| PR-AUC | 0.313 |
 | Baseline fraud rate | 3.50% |
 
 Accuracy is deliberately not reported: a model predicting "never fraud" would
@@ -38,6 +49,37 @@ roughly 9× better than chance.
 
 Validation uses a **chronological split** (earliest 80% for training, latest 20%
 for validation) rather than a random one, preventing temporal leakage.
+
+![Precision-Recall and ROC curves](notebooks/figures/pr_roc_curves.png)
+
+### Threshold selection
+
+The model outputs a probability; the decision threshold sets where to draw the
+line between "approve" and "flag". Lowering it catches more fraud (higher recall)
+at the cost of more false alarms (lower precision). The right value is a business
+decision, driven by the relative cost of a missed fraud versus a manual review.
+
+| Threshold | Recall | Precision | Frauds caught | False alarms |
+|---|---|---|---|---|
+| 0.3 | 84.7% | 6.4% | 3,442 | 50,119 |
+| 0.4 | 74.7% | 8.5% | 3,034 | 32,456 |
+| 0.5 | 62.6% | 12.0% | 2,544 | 18,576 |
+| 0.6 | 53.0% | 16.5% | 2,153 | 10,916 |
+| 0.7 | 43.1% | 23.1% | 1,750 | 5,842 |
+
+In insurance and banking, a missed high-value fraud typically costs far more
+than a manual review, so the threshold would usually be set below 0.5 to favour
+recall.
+
+![Threshold trade-off](notebooks/figures/threshold_tradeoff.png)
+
+### Global explainability
+
+A SHAP summary plot shows which features drive the model overall. The anonymized
+counters (C5, C1) dominate, followed by transaction amount, product type, and
+the engineered time features.
+
+![SHAP summary](notebooks/figures/shap_summary.png)
 
 ## Feature engineering: an experiment worth documenting
 
@@ -63,7 +105,7 @@ sees only *earlier* transactions from the same card, preventing temporal leakage
 
 These features do carry signal — fraud rate rises from 2.3% (below-average
 amounts) to 4.4% (2–5× the card's usual spend). However, adding them produced no
-meaningful gain (PR-AUC 0.3107 → 0.3068), and none appeared in the top 20 feature
+meaningful gain (PR-AUC 0.3132 → 0.3068), and none appeared in the top 20 feature
 importances. The likely cause: `card1` groups ~9,800 values across 590k
 transactions, so it identifies a *card segment* rather than an individual card —
 diluting any individual behavioral signal.
@@ -79,10 +121,10 @@ infrastructure for features that showed no measurable gain.
 
 | Variant | ROC-AUC | PR-AUC | Δ PR-AUC |
 |---|---|---|---|
-| With C counters | 0.8230 | 0.3068 | — |
-| Without C counters | 0.7807 | 0.1680 | **−0.1388** |
+| With C counters | 0.816 | 0.313 | — |
+| Without C counters | 0.781 | 0.168 | **−0.145** |
 
-Removing them costs **45% of the model's precision-recall performance**.
+Removing them costs roughly **45% of the model's precision-recall performance**.
 
 ### Decision
 
@@ -111,9 +153,10 @@ fraud-detection/
 │   ├── raw/                    # Raw Kaggle CSVs
 │   └── processed/              # Cleaned data / features
 │
-├── notebooks/                  # Exploration and prototyping
-│   ├── 01_eda.ipynb            # Exploratory data analysis
-│   └── 02_modeling.ipynb       # Training / model comparison
+├── notebooks/                  # Exploration and analysis
+│   ├── eda.ipynb               # Exploratory data analysis
+│   ├── modeling.ipynb          # Model comparison, evaluation, SHAP
+│   └── figures/                # Saved plots for this README
 │
 ├── src/                        # Reusable source code
 │   ├── config.py               # Paths, constants, parameters

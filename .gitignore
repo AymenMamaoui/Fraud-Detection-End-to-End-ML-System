@@ -12,3 +12,4 @@ venv/
 
 mlruns/
 compare_variants.py
+test.py
