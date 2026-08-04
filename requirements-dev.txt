@@ -1,0 +1,12 @@
+-r requirements.txt
+
+jupyter
+ipykernel
+mlflow
+matplotlib
+seaborn
+streamlit
+requests
+pytest
+httpx
+kaggle

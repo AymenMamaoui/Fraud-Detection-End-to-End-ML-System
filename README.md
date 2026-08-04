@@ -164,7 +164,8 @@ fraud-detection/
 │   ├── features.py             # Feature construction
 │   ├── train.py                # Training pipeline + MLflow
 │   ├── predict.py              # Prediction logic + SHAP
-│   └── api.py                  # FastAPI service
+│   ├── api.py                  # FastAPI service
+    └── monitoring.py           # data drift detection
 │
 ├── dashboard/                  # Streamlit interface
 │   └── app.py
@@ -182,6 +183,34 @@ fraud-detection/
 ├── .env.example                # Environment variable template
 └── README.md
 ```
+
+## Monitoring: data drift detection
+
+A model degrades as incoming data drifts away from its training distribution.
+`src/monitoring.py` splits the data chronologically (early period as reference,
+later period as current) and tests each model feature for distribution drift —
+Kolmogorov-Smirnov for numeric features, chi-squared for categorical ones.
+
+![Drift distributions](notebooks/figures/drift_distributions.png)
+
+7 of 8 features show statistically significant drift. Importantly, significance
+is read alongside magnitude: with ~295k rows per period, tests flag even tiny
+shifts (e.g. `card4` is statistically "drifted" but visually stable). The
+actionable drift is in `card6` and `ProductCD`. Since the model's most important
+features (C5, C1) also drift, periodic retraining would be required in production.
+
+> Note: implemented with scipy rather than a drift library, both to keep
+> dependencies light and to make the detection logic explicit and testable.
+
+### Scope and next steps
+
+This covers **data drift** (input distributions). A production system would add:
+- **Performance monitoring** — tracking PR-AUC/recall over time (complicated in
+  fraud by *label delay*: true labels arrive days/weeks after the transaction).
+- **Concept drift** — detecting when the feature-fraud relationship itself shifts.
+- **Operational monitoring** — API latency, error rate, throughput.
+- **Automated alerting & retraining** — scheduled runs (e.g. Airflow) triggering
+  alerts or retraining when drift or performance thresholds are breached.
 
 ## Getting the data
 
