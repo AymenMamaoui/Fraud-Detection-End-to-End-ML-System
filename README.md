@@ -1,5 +1,10 @@
 # Fraud Detection — End-to-End ML System
 
+An end-to-end machine learning system that scores card transactions for fraud
+risk in real time, explains each decision, and is deployed as a live public demo.
+
+**Live demo:** https://fraud-detection-aymenmm.streamlit.app/
+
 ## Business problem
 Real-time detection of fraudulent card transactions, minimizing financial
 losses while limiting false alarms that degrade the customer experience.
@@ -16,7 +21,7 @@ IEEE-CIS Fraud Detection (Kaggle) — ~590,000 transactions, target `isFraud`.
 ## Approach
 1. **Model** — Gradient boosting (XGBoost) on tabular data
 2. **Explainability** — SHAP (per-feature contributions)
-3. **Deployment** — FastAPI + Docker on AWS
+3. **Serving** — FastAPI service, containerized with Docker
 4. **Interface** — Streamlit dashboard for analyst-facing risk assessment
 5. **Monitoring** — Data drift detection
 
@@ -137,53 +142,6 @@ The dashboard labels these variables neutrally and states explicitly that they
 are proprietary indicators from the payment processor. In a real engagement,
 their definitions would be obtained from the data owner rather than inferred.
 
-## Live demo
-(TODO: API link + dashboard link)
-
-## Tech stack
-Python · pandas · scikit-learn · XGBoost · SHAP · MLflow · FastAPI
-· Docker · AWS · Streamlit
-
-## Project structure
-
-```text
-fraud-detection/
-│
-├── data/                       # Data (git-ignored)
-│   ├── raw/                    # Raw Kaggle CSVs
-│   └── processed/              # Cleaned data / features
-│
-├── notebooks/                  # Exploration and analysis
-│   ├── eda.ipynb               # Exploratory data analysis
-│   ├── modeling.ipynb          # Model comparison, evaluation, SHAP
-│   └── figures/                # Saved plots for this README
-│
-├── src/                        # Reusable source code
-│   ├── config.py               # Paths, constants, parameters
-│   ├── data.py                 # Data loading + merging
-│   ├── features.py             # Feature construction
-│   ├── train.py                # Training pipeline + MLflow
-│   ├── predict.py              # Prediction logic + SHAP
-│   ├── api.py                  # FastAPI service
-    └── monitoring.py           # data drift detection
-│
-├── dashboard/                  # Streamlit interface
-│   └── app.py
-│
-├── models/                     # Trained models (git-ignored)
-├── tests/                      # Unit tests
-├── docker/                     # Containerization
-│   └── Dockerfile
-│
-├── .github/workflows/          # CI/CD (GitHub Actions)
-│   └── ci.yml
-│
-├── requirements.txt            # Python dependencies
-├── .gitignore
-├── .env.example                # Environment variable template
-└── README.md
-```
-
 ## Monitoring: data drift detection
 
 A model degrades as incoming data drifts away from its training distribution.
@@ -209,8 +167,51 @@ This covers **data drift** (input distributions). A production system would add:
   fraud by *label delay*: true labels arrive days/weeks after the transaction).
 - **Concept drift** — detecting when the feature-fraud relationship itself shifts.
 - **Operational monitoring** — API latency, error rate, throughput.
-- **Automated alerting & retraining** — scheduled runs (e.g. Airflow) triggering
-  alerts or retraining when drift or performance thresholds are breached.
+- **Automated alerting & retraining** — scheduled runs triggering alerts or
+  retraining when drift or performance thresholds are breached.
+
+## Tech stack
+Python · pandas · scikit-learn · XGBoost · SHAP · MLflow · FastAPI
+· Docker · Streamlit
+
+## Project structure
+
+```text
+fraud-detection/
+│
+├── data/                       # Data (git-ignored)
+│   ├── raw/                    # Raw Kaggle CSVs
+│   └── processed/              # Cleaned data / features
+│
+├── notebooks/                  # Exploration and analysis
+│   ├── eda.ipynb               # Exploratory data analysis
+│   ├── modeling.ipynb          # Model comparison, evaluation, SHAP
+│   └── figures/                # Saved plots for this README
+│
+├── src/                        # Reusable source code
+│   ├── config.py               # Paths, constants, parameters
+│   ├── data.py                 # Data loading + merging
+│   ├── features.py             # Feature construction (sklearn pipeline)
+│   ├── train.py                # Training pipeline + MLflow
+│   ├── predict.py              # Prediction logic + SHAP
+│   ├── api.py                  # FastAPI service
+│   └── monitoring.py           # Data drift detection
+│
+├── dashboard/                  # Streamlit interface (calls the API)
+│   └── app.py
+│
+├── streamlit_app.py            # Standalone dashboard for deployment
+├── models/                     # Trained model (fraud_pipeline.pkl)
+├── tests/                      # Unit tests (pytest)
+├── docker/                     # Containerization
+│   └── Dockerfile
+│
+├── requirements.txt            # Python dependencies
+├── requirements-dev.txt        # Development dependencies
+├── conftest.py                 # pytest configuration
+├── .gitignore
+└── README.md
+```
 
 ## Getting the data
 
@@ -223,5 +224,29 @@ kaggle competitions download -c ieee-fraud-detection
 unzip ieee-fraud-detection.zip -d data/raw/
 ```
 
-## Installation & usage
-(TODO: to be completed after deployment)
+## Running locally
+
+```bash
+# Install dependencies
+pip install -r requirements-dev.txt
+
+# Train the model (regenerates models/fraud_pipeline.pkl)
+python -m src.train
+
+# Run the API
+uvicorn src.api:app --reload
+
+# Run the dashboard (in a separate terminal)
+streamlit run dashboard/app.py
+
+# Run the tests
+pytest -v
+```
+
+## Architecture
+
+Locally, the dashboard and the API run as two decoupled services communicating
+over HTTP. For the public demo, a standalone version of the dashboard
+(`streamlit_app.py`) embeds the prediction logic directly, since free hosting
+runs a single service. The project is containerized with Docker and ready for a
+multi-service deployment on a cloud platform such as AWS App Runner or ECS/Fargate.
