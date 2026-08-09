@@ -1,5 +1,6 @@
 data/
-models/
+models/*
+!models/.gitkeep
 *.csv
 *.pkl
 __pycache__/
@@ -9,7 +10,9 @@ venv/
 .DS_Store
 .idea/
 .pytest_cache/
-
 mlruns/
 compare_variants.py
 test.py
+
+# Exception: version the trained model for deployment (must come AFTER *.pkl)
+!models/fraud_pipeline.pkl
