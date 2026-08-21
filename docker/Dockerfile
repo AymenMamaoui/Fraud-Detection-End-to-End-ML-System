@@ -1,3 +1,4 @@
+# Packaging the app to be reusable
 FROM python:3.12-slim
 
 WORKDIR /app
